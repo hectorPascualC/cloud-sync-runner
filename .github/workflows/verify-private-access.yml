@@ -1,0 +1,74 @@
+name: Verify private repository access
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Restore encrypted deploy-key state
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .deploy-key-state
+          key: cloud-sync-deploy-keys-v1
+
+      - name: Prepare SSH keys
+        env:
+          STATE_PASSPHRASE: ${{ secrets.STATE_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          test -s .deploy-key-state/code-read.key.gpg
+          test -s .deploy-key-state/data-write.key.gpg
+          test -n "$STATE_PASSPHRASE"
+
+          printf '%s' "$STATE_PASSPHRASE"             | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0                 --decrypt .deploy-key-state/code-read.key.gpg             > "$RUNNER_TEMP/code_read_key"
+
+          printf '%s' "$STATE_PASSPHRASE"             | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0                 --decrypt .deploy-key-state/data-write.key.gpg             > "$RUNNER_TEMP/data_write_key"
+
+          chmod 600 "$RUNNER_TEMP/code_read_key" "$RUNNER_TEMP/data_write_key"
+
+          python - "$RUNNER_TEMP/github_known_hosts" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.request
+
+          target = pathlib.Path(sys.argv[1])
+          req = urllib.request.Request(
+              "https://api.github.com/meta",
+              headers={"Accept": "application/vnd.github+json", "User-Agent": "cloud-sync-runner"},
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              meta = json.load(response)
+          keys = meta.get("ssh_keys") or []
+          if not keys:
+              raise SystemExit("GitHub SSH host keys unavailable")
+          target.write_text("".join(f"github.com {key}\n" for key in keys), encoding="utf-8")
+          target.chmod(0o600)
+          PY
+
+      - name: Verify private code read access
+        env:
+          PRIVATE_CODE_REPOSITORY: ${{ vars.PRIVATE_CODE_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_CODE_REPOSITORY"
+          GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/code_read_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/github_known_hosts -o StrictHostKeyChecking=yes"             git ls-remote --exit-code "git@github.com:${PRIVATE_CODE_REPOSITORY}.git" HEAD >/dev/null
+          echo "Private code access: OK"
+
+      - name: Verify private data access
+        env:
+          PRIVATE_DATA_REPOSITORY: ${{ vars.PRIVATE_DATA_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          test -n "$PRIVATE_DATA_REPOSITORY"
+          GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/data_write_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/github_known_hosts -o StrictHostKeyChecking=yes"             git ls-remote --exit-code "git@github.com:${PRIVATE_DATA_REPOSITORY}.git" HEAD >/dev/null
+          echo "Private data access: OK"
