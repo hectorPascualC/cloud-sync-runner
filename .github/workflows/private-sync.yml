@@ -88,25 +88,11 @@ jobs:
 
           chmod 600 "$RUNNER_TEMP/code_read_key" "$RUNNER_TEMP/data_write_key"
 
-          python - "$KNOWN_HOSTS_FILE" <<'PY'
-          import json
-          import pathlib
-          import sys
-          import urllib.request
-
-          target = pathlib.Path(sys.argv[1])
-          req = urllib.request.Request(
-              "https://api.github.com/meta",
-              headers={"Accept": "application/vnd.github+json", "User-Agent": "cloud-sync-runner"},
-          )
-          with urllib.request.urlopen(req, timeout=30) as response:
-              meta = json.load(response)
-          keys = meta.get("ssh_keys") or []
-          if not keys:
-              raise SystemExit("GitHub SSH host keys unavailable")
-          target.write_text("".join(f"github.com {key}\n" for key in keys), encoding="utf-8")
-          target.chmod(0o600)
-          PY
+cat > "$KNOWN_HOSTS_FILE" <<'EOF'
+github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+EOF
+chmod 600 "$KNOWN_HOSTS_FILE"
 
       - name: Clone private application
         env:
