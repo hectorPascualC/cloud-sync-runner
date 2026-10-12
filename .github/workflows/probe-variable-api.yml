@@ -2,6 +2,8 @@ name: Probe variable API
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   actions: read
