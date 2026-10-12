@@ -78,7 +78,7 @@ jobs:
           mkdir -p "$GARMINTOKENS"
           chmod 700 "$GARMINTOKENS"
           LOG="$RUNNER_TEMP/primary-bootstrap.log"
-          python -c 'from scripts.garmin_bundle.auth_api import authenticate_api; authenticate_api(); print("PRIMARY SESSION: OK")' >"$LOG" 2>&1
+          python scripts/ci_bootstrap_primary_session.py >"$LOG" 2>&1
           rc=$?
           if [[ "$rc" -eq 0 ]]; then
             test -s "$GARMINTOKENS/garmin_tokens.json"
