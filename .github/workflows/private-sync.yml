@@ -38,13 +38,12 @@ jobs:
           echo "PRIVATE_CODE_DIR=$GITHUB_WORKSPACE/private-code" >> "$GITHUB_ENV"
           echo "PRIVATE_DATA_DIR=$GITHUB_WORKSPACE/private-data" >> "$GITHUB_ENV"
           echo "CI_STATE_DIR=$GITHUB_WORKSPACE/.ci-state" >> "$GITHUB_ENV"
+          echo "KNOWN_HOSTS_FILE=$RUNNER_TEMP/github_known_hosts" >> "$GITHUB_ENV"
 
       - name: Preflight protected configuration
         env:
           PRIVATE_CODE_REPOSITORY: ${{ vars.PRIVATE_CODE_REPOSITORY }}
           PRIVATE_DATA_REPOSITORY: ${{ vars.PRIVATE_DATA_REPOSITORY }}
-          PRIVATE_CODE_READ_PAT: ${{ secrets.PRIVATE_CODE_READ_PAT }}
-          PRIVATE_DATA_WRITE_PAT: ${{ secrets.PRIVATE_DATA_WRITE_PAT }}
           STATE_PASSPHRASE: ${{ secrets.STATE_PASSPHRASE }}
           PRIMARY_SESSION_B64: ${{ secrets.PRIMARY_SESSION_B64 }}
           SECONDARY_TOKEN_B64: ${{ secrets.SECONDARY_TOKEN_B64 }}
@@ -54,8 +53,6 @@ jobs:
           required=(
             PRIVATE_CODE_REPOSITORY
             PRIVATE_DATA_REPOSITORY
-            PRIVATE_CODE_READ_PAT
-            PRIVATE_DATA_WRITE_PAT
             STATE_PASSPHRASE
             PRIMARY_SESSION_B64
             SECONDARY_TOKEN_B64
@@ -69,14 +66,56 @@ jobs:
           done
           echo "Protected configuration: OK"
 
-      - name: Checkout private application
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Restore encrypted deploy-key state
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          repository: ${{ vars.PRIVATE_CODE_REPOSITORY }}
-          token: ${{ secrets.PRIVATE_CODE_READ_PAT }}
-          path: private-code
-          fetch-depth: 1
-          persist-credentials: false
+          path: .deploy-key-state
+          key: cloud-sync-deploy-keys-v1
+
+      - name: Prepare private repository SSH access
+        env:
+          STATE_PASSPHRASE: ${{ secrets.STATE_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          test -s .deploy-key-state/code-read.key.gpg
+          test -s .deploy-key-state/data-write.key.gpg
+
+          printf '%s' "$STATE_PASSPHRASE"             | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0                 --decrypt .deploy-key-state/code-read.key.gpg             > "$RUNNER_TEMP/code_read_key"
+
+          printf '%s' "$STATE_PASSPHRASE"             | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0                 --decrypt .deploy-key-state/data-write.key.gpg             > "$RUNNER_TEMP/data_write_key"
+
+          chmod 600 "$RUNNER_TEMP/code_read_key" "$RUNNER_TEMP/data_write_key"
+
+          python - "$KNOWN_HOSTS_FILE" <<'PY'
+          import json
+          import pathlib
+          import sys
+          import urllib.request
+
+          target = pathlib.Path(sys.argv[1])
+          req = urllib.request.Request(
+              "https://api.github.com/meta",
+              headers={"Accept": "application/vnd.github+json", "User-Agent": "cloud-sync-runner"},
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              meta = json.load(response)
+          keys = meta.get("ssh_keys") or []
+          if not keys:
+              raise SystemExit("GitHub SSH host keys unavailable")
+          target.write_text("".join(f"github.com {key}\n" for key in keys), encoding="utf-8")
+          target.chmod(0o600)
+          PY
+
+      - name: Clone private application
+        env:
+          PRIVATE_CODE_REPOSITORY: ${{ vars.PRIVATE_CODE_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          rm -rf "$PRIVATE_CODE_DIR"
+          GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/code_read_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$KNOWN_HOSTS_FILE -o StrictHostKeyChecking=yes"             git clone --depth 1 "git@github.com:${PRIVATE_CODE_REPOSITORY}.git" "$PRIVATE_CODE_DIR"
+          test -s "$PRIVATE_CODE_DIR/run"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -149,14 +188,14 @@ jobs:
           fi
           exit "$rc"
 
-      - name: Checkout private data
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: ${{ vars.PRIVATE_DATA_REPOSITORY }}
-          token: ${{ secrets.PRIVATE_DATA_WRITE_PAT }}
-          path: private-data
-          fetch-depth: 1
-          persist-credentials: true
+      - name: Clone private data
+        env:
+          PRIVATE_DATA_REPOSITORY: ${{ vars.PRIVATE_DATA_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          rm -rf "$PRIVATE_DATA_DIR"
+          GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/data_write_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$KNOWN_HOSTS_FILE -o StrictHostKeyChecking=yes"             git clone --depth 1 "git@github.com:${PRIVATE_DATA_REPOSITORY}.git" "$PRIVATE_DATA_DIR"
+          git -C "$PRIVATE_DATA_DIR" config core.sshCommand             "ssh -i $RUNNER_TEMP/data_write_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$KNOWN_HOSTS_FILE -o StrictHostKeyChecking=yes"
 
       - name: Run private synchronization
         id: private-sync
