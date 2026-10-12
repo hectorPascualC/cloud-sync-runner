@@ -2,6 +2,10 @@ name: Request primary MFA
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/request-primary-mfa.yml'
 
 permissions:
   contents: read
