@@ -41,8 +41,8 @@ jobs:
 
       - name: Preflight protected configuration
         env:
-          PRIVATE_CODE_REPOSITORY: ${{ secrets.PRIVATE_CODE_REPOSITORY }}
-          PRIVATE_DATA_REPOSITORY: ${{ secrets.PRIVATE_DATA_REPOSITORY }}
+          PRIVATE_CODE_REPOSITORY: ${{ vars.PRIVATE_CODE_REPOSITORY }}
+          PRIVATE_DATA_REPOSITORY: ${{ vars.PRIVATE_DATA_REPOSITORY }}
           PRIVATE_CODE_READ_PAT: ${{ secrets.PRIVATE_CODE_READ_PAT }}
           PRIVATE_DATA_WRITE_PAT: ${{ secrets.PRIVATE_DATA_WRITE_PAT }}
           STATE_PASSPHRASE: ${{ secrets.STATE_PASSPHRASE }}
@@ -72,7 +72,7 @@ jobs:
       - name: Checkout private application
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: ${{ secrets.PRIVATE_CODE_REPOSITORY }}
+          repository: ${{ vars.PRIVATE_CODE_REPOSITORY }}
           token: ${{ secrets.PRIVATE_CODE_READ_PAT }}
           path: private-code
           fetch-depth: 1
@@ -152,7 +152,7 @@ jobs:
       - name: Checkout private data
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: ${{ secrets.PRIVATE_DATA_REPOSITORY }}
+          repository: ${{ vars.PRIVATE_DATA_REPOSITORY }}
           token: ${{ secrets.PRIVATE_DATA_WRITE_PAT }}
           path: private-data
           fetch-depth: 1
