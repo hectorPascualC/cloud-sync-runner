@@ -118,6 +118,15 @@ jobs:
           python -m pip install 'garminconnect[typed]==0.3.13' -c requirements-lock.txt >/dev/null
           python -m pip check
 
+      - name: Diagnose private regression gate safely
+        working-directory: private-code
+        run: |
+          set -euo pipefail
+          bash -n scripts/ci_public_runner_runtime.sh
+          python scripts/validate_public_runner_template.py
+          python -m pip install 'pytest==9.0.3' -c requirements-lock.txt >/dev/null
+          python -m pytest -q --tb=no             tests/contract/test_public_runner_template_security.py             tests/contract/test_garmin_physiology_validated_pipeline.py             tests/contract/test_physio_ci_file_fallback_runtime.py             tests/contract/test_physio_fitbit_daily_readiness_capability.py             tests/contract/test_physio_google_health_auth_recovery_runtime_behavior.py             tests/contract/test_physio_google_health_token_storage_contract.py             tests/contract/test_run_physio_launcher.py
+
       - name: Run private regression gate
         working-directory: private-code
         run: |
