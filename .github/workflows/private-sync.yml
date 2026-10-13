@@ -45,7 +45,6 @@ jobs:
           PRIVATE_CODE_REPOSITORY: ${{ vars.PRIVATE_CODE_REPOSITORY }}
           PRIVATE_DATA_REPOSITORY: ${{ vars.PRIVATE_DATA_REPOSITORY }}
           STATE_PASSPHRASE: ${{ secrets.STATE_PASSPHRASE }}
-          PRIMARY_SESSION_B64: ${{ secrets.PRIMARY_SESSION_B64 }}
           SECONDARY_TOKEN_B64: ${{ secrets.SECONDARY_TOKEN_B64 }}
           SECONDARY_CLIENT_B64: ${{ secrets.SECONDARY_CLIENT_B64 }}
         run: |
@@ -54,7 +53,6 @@ jobs:
             PRIVATE_CODE_REPOSITORY
             PRIVATE_DATA_REPOSITORY
             STATE_PASSPHRASE
-            PRIMARY_SESSION_B64
             SECONDARY_TOKEN_B64
             SECONDARY_CLIENT_B64
           )
@@ -142,6 +140,14 @@ jobs:
           restore-keys: |
             private-cloud-state-v1-
 
+      - name: Restore reusable primary session cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .primary-session-state
+          key: cloud-sync-primary-session-lookup-${{ github.run_id }}
+          restore-keys: |
+            cloud-sync-primary-session-v1-
+
       - name: Restore private state
         env:
           STATE_PASSPHRASE: ${{ secrets.STATE_PASSPHRASE }}
@@ -159,7 +165,6 @@ jobs:
 
       - name: Prepare private authentication state
         env:
-          PRIMARY_SESSION_B64: ${{ secrets.PRIMARY_SESSION_B64 }}
           SECONDARY_TOKEN_B64: ${{ secrets.SECONDARY_TOKEN_B64 }}
           SECONDARY_CLIENT_B64: ${{ secrets.SECONDARY_CLIENT_B64 }}
         run: |
