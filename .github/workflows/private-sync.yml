@@ -19,7 +19,10 @@ jobs:
         github.event_name == 'issues' &&
         github.event.issue.user.login == github.repository_owner &&
         github.event.issue.author_association == 'OWNER' &&
-        startsWith(github.event.issue.title, '[run-private-sync]')
+        (
+          startsWith(github.event.issue.title, '[run-private-sync]') ||
+          startsWith(github.event.issue.title, '[run-physio-only]')
+        )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -228,16 +231,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
           set -euo pipefail
-          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "Phase: preparation complete. Garmin + physiology synchronization is running."
+          if [[ "$ISSUE_TITLE" == "[run-physio-only]"* ]]; then
+            BODY="Phase: preparation complete. Physiology-only synchronization is running without Garmin workout downloads."
+          else
+            BODY="Phase: preparation complete. Garmin + physiology synchronization is running."
+          fi
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$BODY"
 
       - name: Run private synchronization
         id: private-sync
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set +e
           LOG="$RUNNER_TEMP/private-sync.log"
-          bash "$PRIVATE_CODE_DIR/scripts/ci_public_runner_runtime.sh" sync >"$LOG" 2>&1
+          if [[ "$EVENT_NAME" == "issues" && "$ISSUE_TITLE" == "[run-physio-only]"* ]]; then
+            bash "$PRIVATE_CODE_DIR/scripts/ci_public_runner_runtime.sh" physio-only >"$LOG" 2>&1
+          else
+            bash "$PRIVATE_CODE_DIR/scripts/ci_public_runner_runtime.sh" sync >"$LOG" 2>&1
+          fi
           rc=$?
           if [[ "$rc" -eq 0 ]]; then
             echo "Private synchronization: OK"
