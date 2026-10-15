@@ -13,3 +13,11 @@ The workflow:
 6. persists a new encrypted cache only after a successful synchronization.
 
 The generic issue trigger is owner-only. Pull requests and fork events never execute the secret-bearing job.
+
+
+## Owner-only triggers
+
+- `[run-private-sync]`: Garmin workouts + PHYSIO synchronization.
+- `[run-physio-only]`: PHYSIO synchronization only. It reuses cached Garmin bundles and never downloads or updates Garmin workouts; if no prior bundle cache exists, it fails closed.
+
+Both issue triggers are restricted to the repository owner and keep private runtime output suppressed from public logs.
