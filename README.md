@@ -21,3 +21,8 @@ The generic issue trigger is owner-only. Pull requests and fork events never exe
 - `[run-physio-only]`: PHYSIO synchronization only. It reuses cached Garmin bundles and never downloads or updates Garmin workouts; if no prior bundle cache exists, it fails closed.
 
 Both issue triggers are restricted to the repository owner and keep private runtime output suppressed from public logs.
+
+
+## Fusion summary
+
+Successful Garmin + PHYSIO and PHYSIO-only runs also refresh a Fusion Training Status summary in the private training-data repository. The public runner never publishes recovery scores, training loads, sleep, HRV, heart-rate, or other personal metric values; public issues and logs expose only generic execution state.
