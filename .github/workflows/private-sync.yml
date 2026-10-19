@@ -303,7 +303,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$JOB_STATUS" == "success" ]]; then
-            BODY="Private synchronization completed successfully."
+            BODY="Private synchronization completed successfully. The private Fusion summary was refreshed without publishing personal metric values."
           else
             BODY="Private synchronization failed. No private diagnostic data is published by this runner."
           fi
