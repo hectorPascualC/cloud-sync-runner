@@ -259,6 +259,20 @@ jobs:
             echo "Private synchronization: OK"
           else
             echo "::error::Private synchronization failed. Detailed output is intentionally suppressed."
+            # Emit only predefined, non-sensitive failure categories. Never print log content.
+            if grep -Fq 'PHYSIO-only requires previously cached Garmin bundles' "$LOG"; then
+              echo "::error::Safe failure category: missing_cached_garmin_bundles."
+            elif grep -Fq 'Google Health audit blocked:' "$LOG"; then
+              echo "::error::Safe failure category: google_health_audit_blocked."
+            elif grep -Fq 'PHYSIO-only stopped at Google Health audit' "$LOG"; then
+              echo "::error::Safe failure category: google_health_audit_failed."
+            elif grep -Fq 'Fitbit archive status is' "$LOG"; then
+              echo "::error::Safe failure category: fitbit_archive_validation_failed."
+            elif grep -Fq 'Google Health PHYSIO unavailable' "$LOG"; then
+              echo "::error::Safe failure category: google_health_failed."
+            else
+              echo "::error::Safe failure category: other_private_sync_error."
+            fi
           fi
           exit "$rc"
 
