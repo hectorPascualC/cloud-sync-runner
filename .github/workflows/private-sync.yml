@@ -263,7 +263,21 @@ jobs:
             if grep -Fq 'PHYSIO-only requires previously cached Garmin bundles' "$LOG"; then
               echo "::error::Safe failure category: missing_cached_garmin_bundles."
             elif grep -Fq 'Google Health audit blocked:' "$LOG"; then
-              echo "::error::Safe failure category: google_health_audit_blocked."
+              if grep -Fq 'requires_reconsent=True' "$LOG" || grep -Fq 'refresh_error=invalid_grant' "$LOG"; then
+                echo "::error::Safe failure category: google_health_reauthorization_required."
+              elif grep -Fq 'status=BLOCKED_FILE_FALLBACK_UNAVAILABLE' "$LOG" || grep -Fq 'status=BLOCKED_TOKEN_STORAGE_UNAVAILABLE' "$LOG"; then
+                echo "::error::Safe failure category: google_health_token_storage_unavailable."
+              elif grep -Fq 'status=blocked_refresh' "$LOG"; then
+                echo "::error::Safe failure category: google_health_oauth_refresh_blocked."
+              elif grep -Fq 'status=blocked_authentication' "$LOG"; then
+                echo "::error::Safe failure category: google_health_authentication_blocked."
+              elif grep -Fq 'status=blocked_scope' "$LOG"; then
+                echo "::error::Safe failure category: google_health_permission_scope_blocked."
+              elif grep -Fq 'status=blocked_provider_or_network' "$LOG"; then
+                echo "::error::Safe failure category: google_health_provider_or_network_blocked."
+              else
+                echo "::error::Safe failure category: google_health_audit_blocked."
+              fi
             elif grep -Fq 'PHYSIO-only stopped at Google Health audit' "$LOG"; then
               echo "::error::Safe failure category: google_health_audit_failed."
             elif grep -Fq 'Fitbit archive status is' "$LOG"; then
